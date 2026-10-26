@@ -1,0 +1,35 @@
+# tender-compliance-rag .gitignore
+
+# ── Generated index (too large for git) ──────────────────────────────────────
+results/faiss_index.npy
+results/chunk_metadata.json
+results/chunks.jsonl
+
+# Keep gitkeep
+!results/.gitkeep
+
+# ── Real tender documents (may be confidential) ───────────────────────────────
+data/tenders/*.pdf
+data/tenders/*.docx
+data/grid_codes/*.pdf
+
+# Keep gitkeep and synthetic txt files
+!data/tenders/.gitkeep
+!data/grid_codes/.gitkeep
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+env/
+.venv/
+.env
+*.egg-info/
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/

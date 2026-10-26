@@ -1,0 +1,7 @@
+# Streamlit Community Cloud requirements
+# tender-compliance-rag cloud deployment
+
+numpy>=1.24.0
+sentence-transformers>=2.2.0
+streamlit>=1.35.0
+requests>=2.31.0
