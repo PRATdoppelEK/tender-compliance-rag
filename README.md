@@ -1,7 +1,7 @@
 # tender-compliance-rag 📋
 
 > **AI-powered Tender & Grid Compliance Assistant for Indian DISCOM BESS Projects**
-> RAG pipeline · Ollama (mistral + nomic-embed-text) · FAISS · Streamlit
+> Section-aware chunking · sentence-transformers embeddings · numpy cosine search · optional Groq LLM · Streamlit Cloud
 
 ---
 
@@ -18,6 +18,8 @@
 A Retrieval-Augmented Generation (RAG) system that indexes Indian power sector tender documents and grid codes, then answers compliance questions in natural language — with every answer **cited to the exact source document and section**.
 
 Built directly from real-world experience analyzing JdVVNL, AVVNL, and MSEDCL BESS tenders.
+
+This repo is the **Streamlit Cloud deployment** (`streamlit_app.py`) — a single, self-contained app with all documents pre-indexed in the code, so the live demo above needs no setup. See "How the live demo actually works" below for the exact architecture.
 
 ---
 
@@ -45,93 +47,78 @@ And get a cited answer in seconds.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ How the live demo actually works
 
 ```
-Tender PDFs + Grid Codes
+Tender PDFs + Grid Codes (pre-chunked, inline in streamlit_app.py)
         ↓
-Section-aware chunking (400 words, 80-word overlap)
+Section-aware chunking (400 words, 80-word overlap, numbered-heading detection)
         ↓
-Embeddings (Ollama: nomic-embed-text, 768-dim)
+Embeddings: sentence-transformers (all-MiniLM-L6-v2), runs on CPU — no Ollama needed
         ↓
-FAISS Vector Index
+Query → cosine similarity search in numpy (no FAISS)
         ↓
-Query → Retriever (cosine similarity + re-ranking)
+Top-k chunks + citations
         ↓
-Top-5 chunks + citations → LLM (Ollama: mistral)
+Answer generation:
+  • If a GROQ_API_KEY secret is set → Groq-hosted Mixtral (mixtral-8x7b-32768) writes
+    the answer from the retrieved chunks
+  • Otherwise (current default on this deployment) → the top cited chunks are shown
+    directly, with relevance scores — no LLM call, just retrieval + citation
         ↓
-Cited answer with source references
-        ↓
-Streamlit UI
+Streamlit UI (4 modes)
 ```
+
+**Honest note on the compliance-check mode:** its colored PASS/FAIL badge is driven by the LLM's answer text. Without a Groq key configured, the fallback answer doesn't contain those literal words, so the badge won't light up right now — you'll still get the correct cited sections, just without the colored verdict. Adding a free Groq API key as a Streamlit secret switches the app to full LLM-generated answers with the PASS/FAIL badge.
 
 ---
 
-## 📦 Project Structure
+## 📦 What's in this repo
 
 ```
 tender-compliance-rag/
-├── data/
-│   ├── document_generator.py     # Synthetic tender + grid code documents
-│   ├── tenders/                  # Tender documents (add real PDFs here)
-│   └── grid_codes/               # Grid code excerpts (CEA, IEEE 1547, IEC 62619)
-│
-├── ingestion/
-│   └── ingest.py                 # Chunking + embedding + FAISS index builder
-│
-├── rag/
-│   ├── retriever.py              # FAISS similarity search + re-ranking
-│   └── generator.py              # Ollama LLM answer generation with citations
-│
-├── dashboard/
-│   └── app.py                    # Streamlit UI — 4 modes
-│
-├── streamlit_app.py              # Streamlit Cloud deployment version
-├── requirements.txt              # Local requirements
-├── requirements_cloud.txt        # Streamlit Cloud requirements
+├── streamlit_app.py              # The entire live app — documents, chunking, retrieval,
+│                                  # optional Groq generation, and the Streamlit UI
+├── requirements.txt               # Local/dev requirements
+├── requirements_cloud.txt         # Streamlit Cloud requirements
 ├── screenshots/
 │   ├── compliance_assistant.png
 │   └── document_browser.png
 └── README.md
 ```
 
+A fuller local version of this idea (FAISS, Ollama-hosted Mistral, a multi-file ingestion pipeline) is a design I've built before, but this public repo is deliberately just the single-file Streamlit Cloud app above — that's what's actually running behind the live demo link.
+
 ---
 
-## ⚙️ Tech Stack
+## ⚙️ Tech Stack (this deployment)
 
 | Layer | Technology |
 |---|---|
 | Language | Python 3.10+ |
-| Embeddings | Ollama — nomic-embed-text (768-dim) |
-| LLM | Ollama — mistral (local, private) |
-| Vector Search | FAISS (numpy-based cosine similarity) |
+| Embeddings | sentence-transformers — all-MiniLM-L6-v2 (CPU) |
+| LLM (optional) | Groq API — Mixtral 8x7B, only if `GROQ_API_KEY` is set as a secret |
+| Vector Search | numpy cosine similarity (no FAISS in this deployment) |
 | Chunking | Section-aware (numbered heading detection) |
 | Dashboard | Streamlit |
-| PDF Processing | pypdf (for real tender PDFs) |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (run it yourself)
 
 ```bash
 git clone https://github.com/PRATdoppelEK/tender-compliance-rag.git
 cd tender-compliance-rag
 
-pip install -r requirements.txt
+pip install -r requirements_cloud.txt
 
-# Install Ollama models
-ollama pull mistral
-ollama pull nomic-embed-text
+# Optional: enable LLM-generated answers instead of the retrieval-only fallback
+export GROQ_API_KEY=your_free_groq_key
 
-# Step 1: Generate synthetic tender documents
-python data/document_generator.py
-
-# Step 2: Ingest and index documents
-python ingestion/ingest.py
-
-# Step 3: Launch the dashboard
-streamlit run dashboard/app.py
+streamlit run streamlit_app.py
 ```
+
+No Ollama, no separate ingestion step — all three tenders and three grid codes are pre-chunked inline in `streamlit_app.py`.
 
 ---
 
@@ -147,7 +134,7 @@ A: JdVVNL requires >= 85% RTE (AC terminals). MSEDCL requires >= 85% AC-AC.
 ```
 
 ### 2. Compliance Check
-Check if your specs meet requirements:
+Check if your specs meet requirements (PASS/FAIL badge needs a Groq key — see above):
 ```
 Q: Does 83% round trip efficiency meet the MSEDCL requirement?
 VERDICT: FAIL
@@ -195,27 +182,15 @@ Strictest: AVVNL (87% including transformer losses)
 | IEC 62619:2022 | International | Lithium battery safety |
 | IEEE 1547-2018 | International | DER interconnection |
 
----
-
-## 📄 Adding Real Tender Documents
-
-```bash
-# Drop your PDF files into:
-data/tenders/your_tender.pdf
-data/grid_codes/your_grid_code.pdf
-
-# Re-run ingestion
-python ingestion/ingest.py
-```
+All documents are synthetic, modelled on real tender structures and requirements — not actual confidential bid documents.
 
 ---
 
 ## 🔒 Privacy
 
-- **100% local** — Ollama runs on your machine
-- No data sent to OpenAI, Anthropic, or any cloud API
-- Suitable for confidential bid documents
-- DPDP Act 2023 compliant
+- Document text is embedded directly in the app; nothing confidential
+- If a Groq key is configured, the question and retrieved chunks are sent to Groq's API for answer generation; without one, everything stays inside the Streamlit Cloud instance
+- Synthetic tender data only — suitable to share publicly
 
 ---
 
@@ -223,15 +198,14 @@ python ingestion/ingest.py
 
 | Component | Status |
 |---|---|
-| Synthetic document generator | ✅ Done |
+| Synthetic document set (3 tenders + 3 grid codes) | ✅ Done |
 | Section-aware chunking | ✅ Done |
-| Ollama embedding pipeline | ✅ Done |
-| FAISS vector index | ✅ Done |
-| Query expansion + re-ranking | ✅ Done |
-| LLM answer generation | ✅ Done |
+| sentence-transformers embedding pipeline | ✅ Done |
+| numpy cosine similarity search | ✅ Done |
+| Optional Groq LLM answer generation | ✅ Done |
+| Retrieval-only fallback (no LLM key) | ✅ Done |
 | Source citation system | ✅ Done |
 | Streamlit dashboard (4 modes) | ✅ Done |
-| PDF ingestion support | ✅ Done |
 | Streamlit Cloud deployment | ✅ Done |
 
 ---
