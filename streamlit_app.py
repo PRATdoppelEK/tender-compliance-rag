@@ -369,7 +369,7 @@ Answer concisely with source citations:"""
                 headers={"Authorization": f"Bearer {groq_key}",
                          "Content-Type": "application/json"},
                 json={
-                    "model": "mixtral-8x7b-32768",
+                    "model": os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),  # mixtral-8x7b was retired by Groq
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 600,
                     "temperature": 0.1,
