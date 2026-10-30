@@ -61,7 +61,7 @@ Query → cosine similarity search in numpy (no FAISS)
 Top-k chunks + citations
         ↓
 Answer generation:
-  • If a GROQ_API_KEY secret is set → Groq-hosted Mixtral (mixtral-8x7b-32768) writes
+  • If a GROQ_API_KEY secret is set → a Groq-hosted LLM (default `openai/gpt-oss-120b`, set `GROQ_MODEL` to change) writes
     the answer from the retrieved chunks
   • Otherwise (current default on this deployment) → the top cited chunks are shown
     directly, with relevance scores — no LLM call, just retrieval + citation
@@ -97,7 +97,7 @@ A fuller local version of this idea (FAISS, Ollama-hosted Mistral, a multi-file 
 |---|---|
 | Language | Python 3.10+ |
 | Embeddings | sentence-transformers — all-MiniLM-L6-v2 (CPU) |
-| LLM (optional) | Groq API — Mixtral 8x7B, only if `GROQ_API_KEY` is set as a secret |
+| LLM (optional) | Groq API — `openai/gpt-oss-120b` by default (`GROQ_MODEL`), only if `GROQ_API_KEY` is set. Mixtral 8x7B was retired by Groq in 2025 |
 | Vector Search | numpy cosine similarity (no FAISS in this deployment) |
 | Chunking | Section-aware (numbered heading detection) |
 | Dashboard | Streamlit |
